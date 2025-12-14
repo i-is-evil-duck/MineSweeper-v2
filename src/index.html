@@ -129,8 +129,8 @@ function generateBoard() {
   bombs = new Set();
 
   while (bombs.size < BOMB_COUNT) {
-    let r = Math.floor(Math.random()*ROWS);
-    let c = Math.floor(Math.random()*COLS);
+    const r = Math.floor(Math.random()*ROWS);
+    const c = Math.floor(Math.random()*COLS);
     bombs.add(`${r},${c}`);
     board[r][c] = -1;
   }
@@ -139,7 +139,7 @@ function generateBoard() {
     if (board[r][c] === -1) continue;
     let count = 0;
     for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
-      let nr=r+dr,nc=c+dc;
+      const nr=r+dr,nc=c+dc;
       if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===-1) count++;
     }
     board[r][c] = count;
@@ -158,14 +158,14 @@ function reveal(r,c){
   revealed[r][c] = true;
   if (board[r][c] === 0)
     for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
-      let nr=r+dr,nc=c+dc;
+      const nr=r+dr,nc=c+dc;
       if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) reveal(nr,nc);
     }
 }
 
 function revealAllBombs() {
   bombs.forEach(b => {
-    const [r, c] = b.split(",").map(Number);
+    const [r,c] = b.split(",").map(Number);
     revealed[r][c] = true;
   });
 }
@@ -196,7 +196,7 @@ function draw(){
   minesText.textContent = `Mines Left: ${BOMB_COUNT - flagsUsed}`;
 
   for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
-    let x=c*CELL_SIZE, y=HUD_HEIGHT+r*CELL_SIZE;
+    const x=c*CELL_SIZE, y=HUD_HEIGHT+r*CELL_SIZE;
     ctx.fillStyle = revealed[r][c] ? "#ddd" : "#999";
     ctx.fillRect(x,y,CELL_SIZE,CELL_SIZE);
 
@@ -223,38 +223,40 @@ function draw(){
   }
 }
 
-/* ---------- TOUCH INPUT ---------- */
+/* ---------- TOUCH INPUT (FIXED) ---------- */
 let pressTimer, longPress=false;
 
 canvas.addEventListener("touchstart", e=>{
-  const rect=canvas.getBoundingClientRect();
-  const t=e.touches[0];
-  const mx=t.clientX-rect.left;
-  const my=t.clientY-rect.top;
-  if (my<HUD_HEIGHT || gameOver) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  const mx = t.clientX - rect.left;
+  const my = t.clientY - rect.top;
+  if (my < HUD_HEIGHT || gameOver) return;
 
-  const r=Math.floor((my-HUD_HEIGHT)/CELL_SIZE);
-  const c=Math.floor(mx/CELL_SIZE);
-  longPress=false;
+  const r = Math.floor((my - HUD_HEIGHT) / CELL_SIZE);
+  const c = Math.floor(mx / CELL_SIZE);
 
-  pressTimer=setTimeout(()=>{
-    flags[r][c]=!flags[r][c];
-    longPress=true;
-  },400);
+  if (revealed[r][c]) return; // ✅ BLOCK flagging revealed tiles
+
+  longPress = false;
+  pressTimer = setTimeout(()=>{
+    if (!revealed[r][c]) flags[r][c] = !flags[r][c];
+    longPress = true;
+  }, 400);
 });
 
 canvas.addEventListener("touchend", e=>{
   clearTimeout(pressTimer);
   if (longPress) return;
 
-  const rect=canvas.getBoundingClientRect();
-  const t=e.changedTouches[0];
-  const mx=t.clientX-rect.left;
-  const my=t.clientY-rect.top;
-  if (my<HUD_HEIGHT || gameOver) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.changedTouches[0];
+  const mx = t.clientX - rect.left;
+  const my = t.clientY - rect.top;
+  if (my < HUD_HEIGHT || gameOver) return;
 
-  const r=Math.floor((my-HUD_HEIGHT)/CELL_SIZE);
-  const c=Math.floor(mx/CELL_SIZE);
+  const r = Math.floor((my - HUD_HEIGHT) / CELL_SIZE);
+  const c = Math.floor(mx / CELL_SIZE);
 
   if (board[r][c] === -1) {
     revealAllBombs();
