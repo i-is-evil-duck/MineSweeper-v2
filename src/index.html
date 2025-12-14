@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Minesweeper Mobile</title>
-
 <style>
+:root {
+  --svg-scale: 0.5; /* Adjust scale for flags/mines */
+}
+
 body {
   margin: 0;
   background: #1e1f26;
@@ -63,9 +66,7 @@ button {
 }
 </style>
 </head>
-
 <body>
-
 <canvas id="game"></canvas>
 
 <div id="menuOverlay">
@@ -78,21 +79,30 @@ button {
 
 <script>
 /* ---------- CONFIG ---------- */
-const COLS = 10;
-const HUD_ROWS = 3;
-const CELL_SIZE = Math.floor(window.innerWidth / COLS);
-const TOTAL_ROWS = Math.floor(window.innerHeight / CELL_SIZE);
-const ROWS = TOTAL_ROWS - HUD_ROWS;
+const COLS = 10; // fixed
+const topMargin = 3; // HUD rows
+const screenWidth = window.innerWidth;
+const screenHeight = window.innerHeight;
+
+// Cell size scaled to width
+const CELL_SIZE = Math.floor(screenWidth / COLS);
+
+// Total rows that fit vertically
+const totalRows = Math.floor(screenHeight / CELL_SIZE);
+
+// Rows available for grid (excluding HUD)
+const ROWS = totalRows - topMargin;
+
+// Vertical offset to align bottom
+const verticalOffset = screenHeight - (ROWS + topMargin) * CELL_SIZE;
+
 const BOMB_COUNT = Math.floor(ROWS * COLS * 0.15);
 
 /* ---------- CANVAS ---------- */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = COLS * CELL_SIZE;
-canvas.height = TOTAL_ROWS * CELL_SIZE;
-
-/* ---------- VERTICAL OFFSET ---------- */
-const verticalOffset = window.innerHeight - TOTAL_ROWS * CELL_SIZE;
+canvas.height = totalRows * CELL_SIZE;
 
 /* ---------- STATE ---------- */
 let board, revealed, flags, bombs;
@@ -101,15 +111,13 @@ let startTime, elapsedTime = 0, timerRunning = false;
 
 /* ---------- NUMBER COLORS (PASTEL) ---------- */
 const NUM_COLORS = {
-  1:"#8fa8ff",
-  2:"#7fd1ae",
-  3:"#f28b82",
-  4:"#9aa4ff",
-  5:"#ff9aa2",
-  6:"#7fcfd4",
-  7:"#cfcfe8",
-  8:"#a0a4c4"
+  1:"#8fa8ff", 2:"#7fd1ae", 3:"#f28b82", 4:"#9aa4ff",
+  5:"#ff9aa2", 6:"#7fcfd4", 7:"#cfcfe8", 8:"#a0a4c4"
 };
+
+/* ---------- SVGS ---------- */
+const flagPath = new Path2D("M232,56V176a8,8,0,0,1-2.76,6c-15.28,13.23-29.89,18-43.82,18-18.91,0-36.57-8.74-53-16.85C105.87,170,82.79,158.61,56,179.77V224a8,8,0,0,1-16,0V56a8,8,0,0,1,2.77-6h0c36-31.18,68.31-15.21,96.79-1.12C167,62.46,190.79,74.2,218.76,50A8,8,0,0,1,232,56Z");
+const minePath = new Path2D("M15.6646 2.82934C16.0351 2.6441 16.4856 2.79427 16.6708 3.16475L17.1708 4.16475C17.3561 4.53524 17.2059 4.98574 16.8354 5.17098C16.4649 5.35623 16.0144 5.20606 15.8292 4.83557L15.3292 3.83557C15.1439 3.46509 15.2941 3.01459 15.6646 2.82934Z M18.8292 7.16475C19.0144 6.79427 19.4649 6.6441 19.8354 6.82934L20.8354 7.32934C21.2059 7.51459 21.3561 7.96509 21.1708 8.33557C20.9856 8.70606 20.5351 8.85623 20.1646 8.67098L19.1646 8.17098C18.7941 7.98574 18.6439 7.53524 18.8292 7.16475Z M20.5303 4.53049C20.8232 4.2376 20.8232 3.76273 20.5303 3.46983C20.2374 3.17694 19.7626 3.17694 19.4697 3.46983L18.4697 4.46983C18.1768 4.76273 18.1768 5.2376 18.4697 5.53049C18.7626 5.82339 19.2374 5.82339 19.5303 5.53049L20.5303 4.53049Z M17 14.5002C17 18.6423 13.6421 22.0002 9.5 22.0002C5.35786 22.0002 2 18.6423 2 14.5002C2 10.358 5.35786 7.00016 9.5 7.00016C13.6421 7.00016 17 10.358 17 14.5002Z M17.5302 7.53049L16.3722 8.68853C16.0486 8.30631 15.6938 7.95143 15.3115 7.62787L16.4696 6.46983C16.7625 6.17694 17.2373 6.17694 17.5302 6.46983C17.8231 6.76273 17.8231 7.2376 17.5302 7.53049Z");
 
 /* ---------- GAME SETUP ---------- */
 function generateBoard() {
@@ -181,39 +189,54 @@ function draw(){
   if (timerRunning)
     elapsedTime = Math.floor((Date.now()-startTime)/1000);
 
-  // HUD text
+  // HUD
   ctx.fillStyle = "#d6d8e5";
   ctx.font = `${CELL_SIZE}px Arial`;
   const flagsUsed = flags.flat().filter(Boolean).length;
-  ctx.fillText(`Mines: ${BOMB_COUNT - flagsUsed}`, 12, CELL_SIZE * 2 + verticalOffset);
-  ctx.fillText(`Time: ${elapsedTime}s`, canvas.width - CELL_SIZE * 4.2, CELL_SIZE * 2 + verticalOffset);
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  ctx.fillText(`Mines: ${BOMB_COUNT - flagsUsed}`, 12, CELL_SIZE * 1.5 + verticalOffset);
+  ctx.textAlign = "right";
+  ctx.fillText(`Time: ${elapsedTime}s`, canvas.width - 12, CELL_SIZE * 1.5 + verticalOffset);
 
-  // Grid
+  const svgScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--svg-scale')) || 0.5;
+
   for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
     const x = c * CELL_SIZE;
-    const y = verticalOffset + (r + HUD_ROWS) * CELL_SIZE;
+    const y = verticalOffset + (r + topMargin) * CELL_SIZE;
 
     ctx.fillStyle = revealed[r][c] ? "#2a2f3f" : "#3a3f58";
     ctx.fillRect(x,y,CELL_SIZE,CELL_SIZE);
 
+    // Numbers centered
     if (revealed[r][c] && board[r][c] > 0) {
       ctx.fillStyle = NUM_COLORS[board[r][c]];
-      ctx.font = `${CELL_SIZE/2}px Arial`;
-      ctx.fillText(board[r][c], x + CELL_SIZE/3, y + CELL_SIZE/1.7);
+      ctx.font = `${CELL_SIZE * 0.6}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(board[r][c], x + CELL_SIZE/2, y + CELL_SIZE/2);
     }
 
-
+    // Flag
     if (flags[r][c] && !revealed[r][c]) {
-    ctx.font = `${CELL_SIZE-26}px Arial`;
-    ctx.fillText("🚩", x+6, y+CELL_SIZE-6);
+      ctx.save();
+      const scale = svgScale * CELL_SIZE / 256;
+      ctx.translate(x + CELL_SIZE/2 - (256/2)*scale, y + CELL_SIZE/2 - (256/2)*scale);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#f28b82";
+      ctx.fill(flagPath);
+      ctx.restore();
     }
 
-
+    // Mine
     if (revealed[r][c] && board[r][c] === -1) {
+      ctx.save();
+      const scale = svgScale * CELL_SIZE / 24;
+      ctx.translate(x + CELL_SIZE/2 - (24/2)*scale, y + CELL_SIZE/2 - (24/2)*scale);
+      ctx.scale(scale, scale);
       ctx.fillStyle = "#e57373";
-      ctx.beginPath();
-      ctx.arc(x+CELL_SIZE/2,y+CELL_SIZE/2,CELL_SIZE/4,0,Math.PI*2);
-      ctx.fill();
+      ctx.fill(minePath);
+      ctx.restore();
     }
 
     ctx.strokeStyle="#4a5070";
@@ -231,9 +254,9 @@ canvas.addEventListener("touchstart", e=>{
   const my=t.clientY-rect.top;
 
   const gridY = Math.floor((my - verticalOffset) / CELL_SIZE);
-  if (gridY < HUD_ROWS || gameOver) return;
+  if (gridY < topMargin || gameOver) return;
 
-  const r = gridY - HUD_ROWS;
+  const r = gridY - topMargin;
   const c = Math.floor(mx / CELL_SIZE);
   if (revealed[r][c]) return;
 
@@ -254,9 +277,9 @@ canvas.addEventListener("touchend", e=>{
   const my=t.clientY-rect.top;
 
   const gridY = Math.floor((my - verticalOffset) / CELL_SIZE);
-  if (gridY < HUD_ROWS || gameOver) return;
+  if (gridY < topMargin || gameOver) return;
 
-  const r = gridY - HUD_ROWS;
+  const r = gridY - topMargin;
   const c = Math.floor(mx / CELL_SIZE);
 
   if (board[r][c] === -1) {
