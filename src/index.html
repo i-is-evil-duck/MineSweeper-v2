@@ -8,31 +8,21 @@
 <style>
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #323232;
-  color: #fff;
+  background: #1e1f26;
+  overflow: hidden;
   user-select: none;
-}
-
-#hud {
-  height: 60px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 12px;
-  background: #282828;
+  color: #d6d8e5;
 }
 
 canvas {
   display: block;
-  margin: 0 auto;
   touch-action: none;
 }
 
 #menuOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(20,22,35,0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -47,14 +37,15 @@ canvas {
 }
 
 #menuCard {
-  background: #444;
-  border-radius: 16px;
-  padding: 24px;
+  background: #2f344d;
+  border-radius: 18px;
+  padding: 26px;
   width: 80%;
-  max-width: 300px;
+  max-width: 320px;
   text-align: center;
   transform: scale(0.5);
-  transition: transform 0.3s ease;
+  transition: transform 0.35s ease;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
 }
 
 #menuOverlay.show #menuCard {
@@ -62,23 +53,18 @@ canvas {
 }
 
 button {
-  margin-top: 16px;
-  padding: 12px 24px;
+  margin-top: 18px;
+  padding: 12px 26px;
   font-size: 16px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: none;
-  background: #2196f3;
-  color: white;
+  background: #7c83ff;
+  color: #ffffff;
 }
 </style>
 </head>
 
 <body>
-
-<div id="hud">
-  <div id="minesLeft">Mines Left: 0</div>
-  <div id="timer">Time: 0s</div>
-</div>
 
 <canvas id="game"></canvas>
 
@@ -86,39 +72,43 @@ button {
   <div id="menuCard">
     <h2 id="menuText"></h2>
     <p id="menuScore"></p>
-    <button onclick="generateBoard()">Reset</button>
+    <button onclick="generateBoard()">New Game</button>
   </div>
 </div>
 
 <script>
 /* ---------- CONFIG ---------- */
-const HUD_HEIGHT = 60;
 const COLS = 10;
+const HUD_ROWS = 3;
 const CELL_SIZE = Math.floor(window.innerWidth / COLS);
-const ROWS = Math.floor((window.innerHeight - HUD_HEIGHT) / CELL_SIZE) - 1;
+const TOTAL_ROWS = Math.floor(window.innerHeight / CELL_SIZE);
+const ROWS = TOTAL_ROWS - HUD_ROWS;
 const BOMB_COUNT = Math.floor(ROWS * COLS * 0.15);
 
 /* ---------- CANVAS ---------- */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = COLS * CELL_SIZE;
-canvas.height = ROWS * CELL_SIZE + HUD_HEIGHT;
+canvas.height = TOTAL_ROWS * CELL_SIZE;
+
+/* ---------- VERTICAL OFFSET ---------- */
+const verticalOffset = window.innerHeight - TOTAL_ROWS * CELL_SIZE;
 
 /* ---------- STATE ---------- */
 let board, revealed, flags, bombs;
 let gameOver = false;
 let startTime, elapsedTime = 0, timerRunning = false;
 
-/* ---------- UI ---------- */
-const minesText = document.getElementById("minesLeft");
-const timerText = document.getElementById("timer");
-const menuOverlay = document.getElementById("menuOverlay");
-const menuText = document.getElementById("menuText");
-const menuScore = document.getElementById("menuScore");
-
-const COLORS = {
-  1:"blue",2:"green",3:"red",4:"navy",
-  5:"maroon",6:"teal",7:"black",8:"gray"
+/* ---------- NUMBER COLORS (PASTEL) ---------- */
+const NUM_COLORS = {
+  1:"#8fa8ff",
+  2:"#7fd1ae",
+  3:"#f28b82",
+  4:"#9aa4ff",
+  5:"#ff9aa2",
+  6:"#7fcfd4",
+  7:"#cfcfe8",
+  8:"#a0a4c4"
 };
 
 /* ---------- GAME SETUP ---------- */
@@ -129,8 +119,8 @@ function generateBoard() {
   bombs = new Set();
 
   while (bombs.size < BOMB_COUNT) {
-    const r = Math.floor(Math.random()*ROWS);
-    const c = Math.floor(Math.random()*COLS);
+    const r = Math.floor(Math.random() * ROWS);
+    const c = Math.floor(Math.random() * COLS);
     bombs.add(`${r},${c}`);
     board[r][c] = -1;
   }
@@ -149,7 +139,7 @@ function generateBoard() {
   startTime = Date.now();
   elapsedTime = 0;
   timerRunning = true;
-  menuOverlay.classList.remove("show");
+  document.getElementById("menuOverlay").classList.remove("show");
 }
 
 /* ---------- HELPERS ---------- */
@@ -163,10 +153,10 @@ function reveal(r,c){
     }
 }
 
-function revealAllBombs() {
-  bombs.forEach(b => {
-    const [r,c] = b.split(",").map(Number);
-    revealed[r][c] = true;
+function revealAllBombs(){
+  bombs.forEach(b=>{
+    const [r,c]=b.split(",").map(Number);
+    revealed[r][c]=true;
   });
 }
 
@@ -179,9 +169,9 @@ function checkWin(){
 function showMenu(win){
   timerRunning = false;
   gameOver = true;
-  menuText.textContent = win ? "You Win!" : "Game Over";
-  menuScore.textContent = `Time: ${elapsedTime}s`;
-  setTimeout(()=>menuOverlay.classList.add("show"), 2000);
+  document.getElementById("menuText").textContent = win ? "You Win!" : "Game Over";
+  document.getElementById("menuScore").textContent = `Time: ${elapsedTime}s`;
+  setTimeout(()=>document.getElementById("menuOverlay").classList.add("show"),2000);
 }
 
 /* ---------- DRAW ---------- */
@@ -191,71 +181,82 @@ function draw(){
   if (timerRunning)
     elapsedTime = Math.floor((Date.now()-startTime)/1000);
 
-  timerText.textContent = `Time: ${elapsedTime}s`;
+  // HUD text
+  ctx.fillStyle = "#d6d8e5";
+  ctx.font = `${CELL_SIZE}px Arial`;
   const flagsUsed = flags.flat().filter(Boolean).length;
-  minesText.textContent = `Mines Left: ${BOMB_COUNT - flagsUsed}`;
+  ctx.fillText(`Mines: ${BOMB_COUNT - flagsUsed}`, 12, CELL_SIZE * 2 + verticalOffset);
+  ctx.fillText(`Time: ${elapsedTime}s`, canvas.width - CELL_SIZE * 4.2, CELL_SIZE * 2 + verticalOffset);
 
+  // Grid
   for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
-    const x=c*CELL_SIZE, y=HUD_HEIGHT+r*CELL_SIZE;
-    ctx.fillStyle = revealed[r][c] ? "#ddd" : "#999";
+    const x = c * CELL_SIZE;
+    const y = verticalOffset + (r + HUD_ROWS) * CELL_SIZE;
+
+    ctx.fillStyle = revealed[r][c] ? "#2a2f3f" : "#3a3f58";
     ctx.fillRect(x,y,CELL_SIZE,CELL_SIZE);
 
-    if (revealed[r][c] && board[r][c]>0) {
-      ctx.fillStyle = COLORS[board[r][c]];
+    if (revealed[r][c] && board[r][c] > 0) {
+      ctx.fillStyle = NUM_COLORS[board[r][c]];
       ctx.font = `${CELL_SIZE/2}px Arial`;
-      ctx.fillText(board[r][c],x+CELL_SIZE/3,y+CELL_SIZE/1.7);
+      ctx.fillText(board[r][c], x + CELL_SIZE/3, y + CELL_SIZE/1.7);
     }
 
-    if (flags[r][c]) {
-      ctx.font = `${CELL_SIZE-26}px Arial`;
-      ctx.fillText("🚩",x+6,y+CELL_SIZE-6);
+
+    if (flags[r][c] && !revealed[r][c]) {
+    ctx.font = `${CELL_SIZE-26}px Arial`;
+    ctx.fillText("🚩", x+6, y+CELL_SIZE-6);
     }
+
 
     if (revealed[r][c] && board[r][c] === -1) {
-      ctx.fillStyle = "red";
+      ctx.fillStyle = "#e57373";
       ctx.beginPath();
       ctx.arc(x+CELL_SIZE/2,y+CELL_SIZE/2,CELL_SIZE/4,0,Math.PI*2);
       ctx.fill();
     }
 
-    ctx.strokeStyle="#555";
+    ctx.strokeStyle="#4a5070";
     ctx.strokeRect(x,y,CELL_SIZE,CELL_SIZE);
   }
 }
 
-/* ---------- TOUCH INPUT (FIXED) ---------- */
+/* ---------- TOUCH INPUT ---------- */
 let pressTimer, longPress=false;
 
 canvas.addEventListener("touchstart", e=>{
-  const rect = canvas.getBoundingClientRect();
-  const t = e.touches[0];
-  const mx = t.clientX - rect.left;
-  const my = t.clientY - rect.top;
-  if (my < HUD_HEIGHT || gameOver) return;
+  const rect=canvas.getBoundingClientRect();
+  const t=e.touches[0];
+  const mx=t.clientX-rect.left;
+  const my=t.clientY-rect.top;
 
-  const r = Math.floor((my - HUD_HEIGHT) / CELL_SIZE);
+  const gridY = Math.floor((my - verticalOffset) / CELL_SIZE);
+  if (gridY < HUD_ROWS || gameOver) return;
+
+  const r = gridY - HUD_ROWS;
   const c = Math.floor(mx / CELL_SIZE);
+  if (revealed[r][c]) return;
 
-  if (revealed[r][c]) return; // ✅ BLOCK flagging revealed tiles
-
-  longPress = false;
-  pressTimer = setTimeout(()=>{
-    if (!revealed[r][c]) flags[r][c] = !flags[r][c];
-    longPress = true;
-  }, 400);
+  longPress=false;
+  pressTimer=setTimeout(()=>{
+    if (!revealed[r][c]) flags[r][c]=!flags[r][c];
+    longPress=true;
+  },400);
 });
 
 canvas.addEventListener("touchend", e=>{
   clearTimeout(pressTimer);
   if (longPress) return;
 
-  const rect = canvas.getBoundingClientRect();
-  const t = e.changedTouches[0];
-  const mx = t.clientX - rect.left;
-  const my = t.clientY - rect.top;
-  if (my < HUD_HEIGHT || gameOver) return;
+  const rect=canvas.getBoundingClientRect();
+  const t=e.changedTouches[0];
+  const mx=t.clientX-rect.left;
+  const my=t.clientY-rect.top;
 
-  const r = Math.floor((my - HUD_HEIGHT) / CELL_SIZE);
+  const gridY = Math.floor((my - verticalOffset) / CELL_SIZE);
+  if (gridY < HUD_ROWS || gameOver) return;
+
+  const r = gridY - HUD_ROWS;
   const c = Math.floor(mx / CELL_SIZE);
 
   if (board[r][c] === -1) {
