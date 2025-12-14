@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minesweeper Mobile</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #323232;
+  color: #fff;
+  user-select: none;
+}
+
+#hud {
+  height: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  background: #282828;
+}
+
+canvas {
+  display: block;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+#menuOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#menuOverlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#menuCard {
+  background: #444;
+  border-radius: 16px;
+  padding: 24px;
+  width: 80%;
+  max-width: 300px;
+  text-align: center;
+  transform: scale(0.5);
+  transition: transform 0.3s ease;
+}
+
+#menuOverlay.show #menuCard {
+  transform: scale(1);
+}
+
+button {
+  margin-top: 16px;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  background: #2196f3;
+  color: white;
+}
+</style>
+</head>
+
+<body>
+
+<div id="hud">
+  <div id="minesLeft">Mines Left: 0</div>
+  <div id="timer">Time: 0s</div>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="menuOverlay">
+  <div id="menuCard">
+    <h2 id="menuText"></h2>
+    <p id="menuScore"></p>
+    <button onclick="generateBoard()">Reset</button>
+  </div>
+</div>
+
+<script>
+/* ---------- CONFIG ---------- */
+const HUD_HEIGHT = 60;
+const COLS = 10;
+const CELL_SIZE = Math.floor(window.innerWidth / COLS);
+const ROWS = Math.floor((window.innerHeight - HUD_HEIGHT) / CELL_SIZE) - 1;
+const BOMB_COUNT = Math.floor(ROWS * COLS * 0.15);
+
+/* ---------- CANVAS ---------- */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = COLS * CELL_SIZE;
+canvas.height = ROWS * CELL_SIZE + HUD_HEIGHT;
+
+/* ---------- STATE ---------- */
+let board, revealed, flags, bombs;
+let gameOver = false;
+let startTime, elapsedTime = 0, timerRunning = false;
+
+/* ---------- UI ---------- */
+const minesText = document.getElementById("minesLeft");
+const timerText = document.getElementById("timer");
+const menuOverlay = document.getElementById("menuOverlay");
+const menuText = document.getElementById("menuText");
+const menuScore = document.getElementById("menuScore");
+
+const COLORS = {
+  1:"blue",2:"green",3:"red",4:"navy",
+  5:"maroon",6:"teal",7:"black",8:"gray"
+};
+
+/* ---------- GAME SETUP ---------- */
+function generateBoard() {
+  board = Array.from({length: ROWS}, ()=>Array(COLS).fill(0));
+  revealed = Array.from({length: ROWS}, ()=>Array(COLS).fill(false));
+  flags = Array.from({length: ROWS}, ()=>Array(COLS).fill(false));
+  bombs = new Set();
+
+  while (bombs.size < BOMB_COUNT) {
+    let r = Math.floor(Math.random()*ROWS);
+    let c = Math.floor(Math.random()*COLS);
+    bombs.add(`${r},${c}`);
+    board[r][c] = -1;
+  }
+
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    if (board[r][c] === -1) continue;
+    let count = 0;
+    for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
+      let nr=r+dr,nc=c+dc;
+      if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===-1) count++;
+    }
+    board[r][c] = count;
+  }
+
+  gameOver = false;
+  startTime = Date.now();
+  elapsedTime = 0;
+  timerRunning = true;
+  menuOverlay.classList.remove("show");
+}
+
+/* ---------- HELPERS ---------- */
+function reveal(r,c){
+  if (revealed[r][c] || flags[r][c]) return;
+  revealed[r][c] = true;
+  if (board[r][c] === 0)
+    for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
+      let nr=r+dr,nc=c+dc;
+      if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) reveal(nr,nc);
+    }
+}
+
+function revealAllBombs() {
+  bombs.forEach(b => {
+    const [r, c] = b.split(",").map(Number);
+    revealed[r][c] = true;
+  });
+}
+
+function checkWin(){
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++)
+    if (board[r][c]!==-1 && !revealed[r][c]) return false;
+  return true;
+}
+
+function showMenu(win){
+  timerRunning = false;
+  gameOver = true;
+  menuText.textContent = win ? "You Win!" : "Game Over";
+  menuScore.textContent = `Time: ${elapsedTime}s`;
+  setTimeout(()=>menuOverlay.classList.add("show"), 2000);
+}
+
+/* ---------- DRAW ---------- */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if (timerRunning)
+    elapsedTime = Math.floor((Date.now()-startTime)/1000);
+
+  timerText.textContent = `Time: ${elapsedTime}s`;
+  const flagsUsed = flags.flat().filter(Boolean).length;
+  minesText.textContent = `Mines Left: ${BOMB_COUNT - flagsUsed}`;
+
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    let x=c*CELL_SIZE, y=HUD_HEIGHT+r*CELL_SIZE;
+    ctx.fillStyle = revealed[r][c] ? "#ddd" : "#999";
+    ctx.fillRect(x,y,CELL_SIZE,CELL_SIZE);
+
+    if (revealed[r][c] && board[r][c]>0) {
+      ctx.fillStyle = COLORS[board[r][c]];
+      ctx.font = `${CELL_SIZE/2}px Arial`;
+      ctx.fillText(board[r][c],x+CELL_SIZE/3,y+CELL_SIZE/1.7);
+    }
+
+    if (flags[r][c]) {
+      ctx.font = `${CELL_SIZE-26}px Arial`;
+      ctx.fillText("🚩",x+6,y+CELL_SIZE-6);
+    }
+
+    if (revealed[r][c] && board[r][c] === -1) {
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.arc(x+CELL_SIZE/2,y+CELL_SIZE/2,CELL_SIZE/4,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.strokeStyle="#555";
+    ctx.strokeRect(x,y,CELL_SIZE,CELL_SIZE);
+  }
+}
+
+/* ---------- TOUCH INPUT ---------- */
+let pressTimer, longPress=false;
+
+canvas.addEventListener("touchstart", e=>{
+  const rect=canvas.getBoundingClientRect();
+  const t=e.touches[0];
+  const mx=t.clientX-rect.left;
+  const my=t.clientY-rect.top;
+  if (my<HUD_HEIGHT || gameOver) return;
+
+  const r=Math.floor((my-HUD_HEIGHT)/CELL_SIZE);
+  const c=Math.floor(mx/CELL_SIZE);
+  longPress=false;
+
+  pressTimer=setTimeout(()=>{
+    flags[r][c]=!flags[r][c];
+    longPress=true;
+  },400);
+});
+
+canvas.addEventListener("touchend", e=>{
+  clearTimeout(pressTimer);
+  if (longPress) return;
+
+  const rect=canvas.getBoundingClientRect();
+  const t=e.changedTouches[0];
+  const mx=t.clientX-rect.left;
+  const my=t.clientY-rect.top;
+  if (my<HUD_HEIGHT || gameOver) return;
+
+  const r=Math.floor((my-HUD_HEIGHT)/CELL_SIZE);
+  const c=Math.floor(mx/CELL_SIZE);
+
+  if (board[r][c] === -1) {
+    revealAllBombs();
+    showMenu(false);
+  } else {
+    reveal(r,c);
+    if (checkWin()) showMenu(true);
+  }
+});
+
+/* ---------- START ---------- */
+generateBoard();
+function loop(){ draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>
